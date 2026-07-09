@@ -1,0 +1,962 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+  <title>My DeepSeek</title>
+
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
+
+  
+  <link rel="stylesheet" href="./styles.css">
+  <script>
+  (function () {
+    function fail(reason) {
+      var target = './unsupported.html?reason=' + encodeURIComponent(reason || 'unknown');
+      if (window.location.replace) {
+        window.location.replace(target);
+      } else {
+        window.location.href = target;
+      }
+    }
+
+    function supportsSyntax(code) {
+      try {
+        new Function(code);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function supportsLocalStorage() {
+      try {
+        var key = '__mydeepseek_compat_test__';
+        window.localStorage.setItem(key, '1');
+        window.localStorage.removeItem(key);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function loadScript(src, type, onload, onerrorReason) {
+      var script = document.createElement('script');
+      if (type) script.type = type;
+      script.src = src;
+      script.onload = onload || null;
+      script.onerror = function () {
+        fail(onerrorReason || 'script_load_failed');
+      };
+      document.head.appendChild(script);
+    }
+
+    // loadApp();  // 注释掉原来的
+// 直接执行加载，绕过所有检测
+(function() {
+    function loadScript(src, type, onload, onerrorReason) {
+        var script = document.createElement('script');
+        if (type) script.type = type;
+        script.src = src;
+        script.onload = onload || null;
+        script.onerror = function() {
+            console.warn('脚本加载失败:', src);
+        };
+        document.head.appendChild(script);
+    }
+    loadScript('./prompts.js', '', function() {
+        loadScript('./modules/init.js?v=3', 'module');
+    }, 'prompts_load_failed');
+})();
+  </script>
+  </head>
+<body class="max-w-full mx-0 safe-area-bottom">
+
+<div class="fixed top-0 left-0 right-0 bg-black/95 z-20 p-3 border-b border-gray-800 flex items-center justify-between">
+  <button id="menuBtn" class="text-white text-2xl px-2 leading-none focus:outline-none">☰</button>
+  <div class="flex-1 flex items-center justify-center gap-2 max-w-md mx-4">
+    <h1 id="appTitle" class="text-lg font-medium text-white m-0">My DeepSeek</h1>
+    <div id="searchBox" class="hidden flex-1 flex items-center bg-gray-800 rounded-lg px-3 py-1.5 border border-gray-700">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400 flex-shrink-0"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+      <input id="searchInput" type="text" class="bg-transparent border-none outline-none text-white text-sm flex-1 ml-2" placeholder="搜索对话内容...">
+      <button id="closeSearchBtn" class="text-gray-400 hover:text-white text-lg leading-none">&times;</button>
+    </div>
+  </div>
+
+  <div class="flex items-center gap-1">
+    <div class="relative inline-flex">
+      <button id="addTab" class="text-gray-500 hover:text-gray-300 p-2 focus:outline-none transition-colors" title="新建">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+      </button>
+      <div id="addTabDropdown" class="hidden absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 py-1 min-w-[140px]">
+        <button id="addTabSingle" class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          新建对话
+        </button>
+        <button id="addTabGroup" class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          新建群聊
+        </button>
+        <button id="addTabCharacter" class="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          新建角色对话
+        </button>
+      </div>
+    </div>
+    <button id="searchToggleBtn" class="text-gray-500 hover:text-gray-300 p-2 focus:outline-none transition-colors" title="搜索对话 (Ctrl+F)">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+    </button>
+  </div>
+</div>
+
+<div id="sidebarOverlay" class="fixed inset-0 bg-black/60 z-30 opacity-0 pointer-events-none transition-opacity duration-300"></div>
+
+<div id="sidebar" class="fixed top-0 left-0 bottom-0 w-64 bg-gray-900 z-40 transform -translate-x-full transition-transform duration-300 flex flex-col border-r border-gray-800">
+  <div class="p-4 border-b border-gray-800 mt-4 space-y-3">
+    <button id="openPromptMarketBtn" class="w-full bg-gray-700 hover:bg-gray-600 py-2 rounded-lg text-white flex items-center justify-center transition-colors">指令市场</button>
+    <button id="openPromptManagerBtn" class="w-full bg-gray-700 hover:bg-gray-600 py-2 rounded-lg text-white flex items-center justify-center transition-colors">指令管理</button>
+    <button id="openCharacterBtn" class="w-full bg-gray-700 hover:bg-gray-600 py-2 rounded-lg text-white flex items-center justify-center transition-colors">角色卡管理</button>
+  </div>
+
+  <div id="tabs" class="flex-1 overflow-y-auto p-2 space-y-1 inl_0201436a24"></div>
+
+  <div class="p-4 border-t border-gray-800">
+    <div id="storageUsageBar" class="storage-usage-bar">
+      <span id="storageUsageText" class="storage-usage-text"></span>
+      <span id="storageWarningIcon" class="storage-warning-icon hidden" title="本地存储接近上限，点击查看释放方式">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+      </span>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button id="openFavoritesBtn" class="flex-1 bg-gray-800 hover:bg-gray-700 p-3 rounded-lg text-gray-300 transition-colors flex items-center justify-center" title="收藏">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.75l2.86 5.79 6.39.93-4.62 4.5 1.09 6.36L12 17.32 6.28 20.33l1.09-6.36-4.62-4.5 6.39-.93L12 2.75z"></path></svg>
+      </button>
+      <button id="openInfoBtn" class="flex-1 bg-gray-800 hover:bg-gray-700 p-3 rounded-lg text-gray-300 transition-colors flex items-center justify-center" title="关于本站">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+      </button>
+      <button id="settingsBtn" class="flex-1 bg-gray-800 hover:bg-gray-700 p-3 rounded-lg text-gray-300 transition-colors flex items-center justify-center" title="设置">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </button>
+      <button id="openDonateBtn" class="flex-1 bg-gray-800 hover:bg-gray-700 p-3 rounded-lg text-gray-300 transition-colors flex items-center justify-center" title="支持与捐赠">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="favoritesPanel" class="panel-modal hidden">
+  <div id="favoritesPanelMask" class="panel-backdrop"></div>
+  <div class="prompt-panel-container favorites-panel-container">
+    <div class="prompt-panel-header">
+      <h3 class="text-white text-base font-semibold">收藏栏</h3>
+      <button id="favoritesPanelCloseBtn" class="text-gray-400 hover:text-white text-2xl leading-none" type="button" aria-label="关闭收藏栏">&times;</button>
+    </div>
+    <div id="favoritesList" class="prompt-panel-body favorites-list"></div>
+  </div>
+</div>
+
+<div id="favoritePreviewPanel" class="panel-modal hidden">
+  <div id="favoritePreviewPanelMask" class="panel-backdrop"></div>
+  <div class="prompt-panel-container favorite-preview-container">
+    <div class="prompt-panel-header">
+      <div>
+        <h3 class="text-white text-base font-semibold">收藏详情</h3>
+        <div id="favoritePreviewMeta" class="text-xs text-gray-400 mt-1"></div>
+      </div>
+      <button id="favoritePreviewPanelCloseBtn" class="text-gray-400 hover:text-white text-2xl leading-none" type="button" aria-label="关闭收藏详情">&times;</button>
+    </div>
+    <div class="prompt-panel-body favorite-preview-body">
+      <div id="favoritePreviewContent" class="favorite-preview-content"></div>
+    </div>
+  </div>
+</div>
+
+<div id="settingsPanel" class="fixed inset-0 bg-black/95 flex items-center justify-center z-50 hidden">
+  <div class="settings-panel-card bg-gray-900 p-6 rounded-2xl w-[90%] max-w-md border border-gray-700">
+    <h3 class="text-white text-lg font-medium mb-5 text-center">设置</h3>
+    
+    <div class="mb-6">
+      <h4 class="text-white text-sm font-medium mb-3">API Key</h4>
+      <div class="settings-api-row flex gap-2 items-center">
+        <input id="settingsApiKeyInput" class="min-w-0 flex-1 p-3 bg-gray-800 rounded border border-gray-700 text-white outline-none focus:border-blue-500 transition-colors" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button id="settingsCopyKeyBtn" class="settings-icon-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded text-gray-300 transition-colors" type="button" aria-label="复制 API Key" title="复制 API Key">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="9" y="9" width="11" height="11" rx="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </button>
+        <button id="settingsSaveKeyBtn" class="settings-save-key-btn bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded text-white font-medium transition-colors whitespace-nowrap">保存</button>
+      </div>
+    </div>
+    
+    <div class="mb-6">
+      <h4 class="text-white text-sm font-medium mb-3">外观</h4>
+      <div class="settings-day-mode-container flex items-center justify-between bg-gray-800 p-3 rounded-lg border border-gray-700">
+        <div class="text-sm text-gray-300">日间模式</div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="settingsDayModeToggle" class="sr-only peer">
+          <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
+    </div>
+    
+    <div class="mb-6">
+      <h4 class="text-white text-sm font-medium mb-3">对话框字号</h4>
+      <div class="settings-font-grid grid grid-cols-5 gap-2">
+        <button class="font-size-option py-2 rounded border border-gray-700 text-gray-400 transition-colors" data-size="small">小</button>
+        <button class="font-size-option py-2 rounded border border-gray-700 text-gray-400 transition-colors" data-size="smaller">较小</button>
+        <button class="font-size-option active py-2 rounded border border-blue-500 text-white transition-colors bg-blue-600" data-size="default">默认</button>
+        <button class="font-size-option py-2 rounded border border-gray-700 text-gray-400 transition-colors" data-size="larger">较大</button>
+        <button class="font-size-option py-2 rounded border border-gray-700 text-gray-400 transition-colors" data-size="large">大</button>
+      </div>
+    </div>
+    
+    <div class="mb-6">
+      <h4 class="text-white text-sm font-medium mb-3">显示设置</h4>
+      <div class="settings-day-mode-container flex items-center justify-between bg-gray-800 p-3 rounded-lg border border-gray-700">
+        <div class="text-sm text-gray-300">显示Token预估</div>
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="settingsTokenEstimateToggle" class="sr-only peer" checked>
+          <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
+    </div>
+    
+    <div class="mb-6">
+      <h4 class="text-white text-sm font-medium mb-3">生成设置</h4>
+      <div class="settings-day-mode-container flex items-center justify-between gap-4 bg-gray-800 p-3 rounded-lg border border-gray-700">
+        <div>
+          <div class="text-sm text-gray-300">去 AI 味（普通对话）</div>
+          <div class="text-xs text-gray-500 mt-1 leading-relaxed">开启后，普通对话会额外自检和精修，回复可能稍慢并消耗更多 token。群聊和角色对话不受影响。</div>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+          <input type="checkbox" id="settingsHumanizeNormalChatToggle" class="sr-only peer">
+          <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </label>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <div class="flex items-center gap-2 mb-3">
+        <h4 class="text-white text-sm font-medium">模型选择</h4>
+        <button id="modelInfoToggle" type="button" class="model-info-btn" title="查看详情" onclick="document.getElementById('modelInfoPanel').classList.remove('hidden')">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        </button>
+      </div>
+      <div class="space-y-2">
+        <label class="flex items-center gap-3 bg-gray-800 p-3 rounded-lg border border-gray-700 cursor-pointer hover:bg-gray-700 transition-colors">
+          <input type="radio" name="modelChoice" id="modelChoiceV4Flash" value="deepseek-v4-flash" checked class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500">
+          <span class="text-sm text-white">V4-Flash(快速模式) <span class="text-xs text-blue-400 ml-1">推荐</span></span>
+        </label>
+        <label class="flex items-center gap-3 bg-gray-800 p-3 rounded-lg border border-gray-700 cursor-pointer hover:bg-gray-700 transition-colors">
+          <input type="radio" name="modelChoice" id="modelChoiceV4Pro" value="deepseek-v4-pro" class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500">
+          <span class="text-sm text-white">V4-Pro(专家模式)</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <h4 class="text-white text-sm font-medium mb-3">记忆策略</h4>
+      <div class="space-y-2">
+        <label class="flex items-center gap-3 bg-gray-800 p-3 rounded-lg border border-gray-700 cursor-pointer hover:bg-gray-700 transition-colors">
+          <input type="radio" name="memoryStrategy" id="memoryStrategyWindow" value="window" class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500">
+          <div>
+            <div class="text-sm text-white">滑动窗口摘要</div>
+            <div class="text-xs text-gray-400">自动压缩早期对话，保留最近 20 条原文，节省 token</div>
+          </div>
+        </label>
+        <label class="flex items-center gap-3 bg-gray-800 p-3 rounded-lg border border-gray-700 cursor-pointer hover:bg-gray-700 transition-colors">
+          <input type="radio" name="memoryStrategy" id="memoryStrategyFull" value="full" class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500">
+          <div>
+            <div class="text-sm text-white">全量发送</div>
+            <div class="text-xs text-gray-400">发送全部历史消息，不做摘要，token 消耗可能很高</div>
+          </div>
+        </label>
+      </div>
+    </div>
+    
+    <button id="settingsCloseBtn" class="w-full bg-gray-700 hover:bg-gray-600 py-2 rounded-lg text-sm text-white transition-colors">关闭</button>
+  </div>
+</div>
+
+<div id="searchResultsInfo" class="fixed top-16 left-0 right-0 bg-blue-600/90 text-white text-center py-2 text-sm z-10 hidden">
+  <span id="searchResultsText"></span>
+  <div class="inline-flex gap-2 ml-3">
+    <button id="prevSearchResult" class="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded text-xs">上一个</button>
+    <button id="nextSearchResult" class="bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded text-xs">下一个</button>
+  </div>
+</div>
+
+<div id="chat" class="pt-16 pb-32 px-4 h-screen overflow-y-auto space-y-4 bg-black"></div>
+
+<div id="emptyChatHint" class="fixed left-1/2 transform -translate-x-1/2 bottom-48 text-center hidden">
+  <div class="text-gray-500 text-sm space-y-1">
+    <div>不知道跟<span id="emptyChatHintCharName">DS老师</span>聊什么？</div>
+    <div><span class="text-blue-400 cursor-pointer hover:underline" id="openMarketFromHint">看看指令市场！</span></div>
+  </div>
+</div>
+
+<button id="scrollToBottomBtn" class="scroll-to-bottom-btn" title="快速到底部">↓</button>
+
+<div class="input-container safe-area-bottom">
+  <div class="input-shell">
+    <div class="input-toolbar">
+      <label class="deepthink-chip" onclick="return window.forceToggleDeepThinkFromUI ? window.forceToggleDeepThinkFromUI(event) : false;">
+        <input type="checkbox" id="deepThinkToggle" class="sr-only peer" onchange="if (window.syncDeepThinkFromInput) window.syncDeepThinkFromInput(this.checked);">
+        <span class="deepthink-chip-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"></path>
+          </svg>
+        </span>
+        <span class="deepthink-chip-text">深度思考</span>
+      </label>
+      <label class="deepthink-chip htmlmode-chip" id="htmlModeChip">
+        <input type="checkbox" id="htmlModeToggle" class="sr-only peer">
+        <span class="deepthink-chip-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="14" rx="2"></rect>
+            <path d="M3 8h18"></path>
+            <path d="M8 20h8"></path>
+          </svg>
+        </span>
+        <span class="deepthink-chip-text">预览网页</span>
+      </label>
+      <div class="input-counter toolbar-input-counter text-xs text-gray-500" id="inputCounter">0 字</div>
+    </div>
+    <div id="txtAttachmentBar" class="txt-attachment-bar hidden">
+      <input id="txtUploadInput" type="file" accept=".txt,text/plain" class="hidden">
+      <div class="txt-attachment-main">
+        <div class="txt-attachment-title-row">
+          <span class="txt-attachment-badge">TXT</span>
+          <span id="txtAttachmentName" class="txt-attachment-name"></span>
+          <span id="txtAttachmentMode" class="txt-attachment-mode"></span>
+        </div>
+        <div id="txtAttachmentMeta" class="txt-attachment-meta"></div>
+      </div>
+      <button id="removeTxtAttachmentBtn" class="txt-attachment-remove" type="button" title="移除 txt 文件">移除</button>
+    </div>
+    <div id="replyBar" class="reply-bar hidden">
+      <div class="reply-bar-content">
+        <span class="reply-bar-text">回复 <strong id="replyBarCharName"></strong></span>
+        <span class="reply-bar-snippet" id="replyBarSnippet"></span>
+      </div>
+      <button id="replyBarCancel" class="reply-bar-cancel" title="取消回复">&times;</button>
+    </div>
+    <div class="input-wrapper">
+      <textarea id="input" class="flex-1 bg-gray-800 border border-gray-700 text-white text-base" placeholder="输入消息..." rows="1"></textarea>
+      <div class="composer-primary-slot">
+        <button id="sendBtn" class="plus-mode" title="更多操作" aria-label="更多操作">+</button>
+      </div>
+    </div>
+    <div id="composerActionMenu" class="composer-action-menu hidden">
+      <button id="openStoryArchiveBtn" class="composer-action-item" type="button" title="打开剧情档案馆">
+        <span class="composer-action-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+        </span>
+        <span class="composer-action-label">剧情档案馆</span>
+        <span class="composer-action-subtitle">整理关系和伏笔</span>
+      </button>
+      <button id="openBgInfoBtn" class="composer-action-item" type="button" title="设定背景信息">
+        <span class="composer-action-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+          </svg>
+        </span>
+        <span class="composer-action-label">背景设定</span>
+        <span class="composer-action-subtitle">补充身份和场景</span>
+      </button>
+      <button id="openTxtUploadBtn" class="composer-action-item" type="button" title="上传 txt 文件">
+        <span class="composer-action-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <path d="M17 8l-5-5-5 5"></path>
+            <path d="M12 3v12"></path>
+          </svg>
+        </span>
+        <span class="composer-action-label">TXT 文件</span>
+        <span class="composer-action-subtitle">上传文本做上下文</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- HTML 预览引导弹框 -->
+<div id="htmlModeGuidePanel" class="fixed inset-0 bg-black/80 items-center justify-center z-50 hidden" style="display:none;">
+  <div class="bg-gray-900 p-6 rounded-2xl w-[92%] max-w-md border border-gray-700 relative">
+    <button id="htmlModeGuideCloseBtn" class="absolute top-3 right-3 text-gray-400 hover:text-white text-xl leading-none" type="button" aria-label="关闭">&times;</button>
+    <div class="html-guide-title">
+      <span class="html-guide-title-icon" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="14" rx="2"></rect>
+          <path d="M3 8h18"></path>
+          <path d="M8 20h8"></path>
+        </svg>
+      </span>
+      <span>预览网页 · 把创意变成能看见的页面</span>
+    </div>
+    <div class="html-guide-body">
+      <p>开启后，AI 的回答会自动变成一个真实可预览的网页——无论是角色资料卡、同人作品展示页，还是一张纪念你和 CP 故事的"证件"，生成完成后一键预览即可。</p>
+      <p class="text-gray-400">不用懂代码，描述你想要的样子就行。</p>
+    </div>
+    <div class="html-guide-example">
+      <div class="html-guide-example-head">
+        <span class="html-guide-example-label">指令示例</span>
+        <div class="html-guide-example-actions">
+          <button id="htmlModeGuideRefreshBtn" type="button" class="html-guide-example-btn" title="换一个示例" aria-label="换一个示例">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path>
+              <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"></path>
+            </svg>
+          </button>
+          <button id="htmlModeGuideCopyBtn" type="button" class="html-guide-example-btn" title="复制到输入框" aria-label="复制到输入框">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div id="htmlModeGuideExample" class="html-guide-example-text"></div>
+    </div>
+    <button id="htmlModeGuideConfirmBtn" type="button" class="html-guide-confirm-btn">好，开始创作</button>
+  </div>
+</div>
+
+<div id="keyPanel" class="fixed inset-0 bg-black/95 flex items-center justify-center z-50 hidden">
+  <div class="bg-gray-900 p-6 rounded-2xl w-[90%] max-w-md border border-gray-700">
+    <h3 class="text-white text-lg font-medium mb-4 text-center">【MyDeepSeek】输入 DeepSeek API Key</h3>
+
+    <div class="text-sm text-gray-300 mb-5 space-y-3 leading-relaxed bg-gray-800/50 p-4 rounded-lg border border-gray-700/50">
+      <p>1. 登录 DeepSeek 官网：<a href="https://platform.deepseek.com/" target="_blank" class="text-blue-400 hover:text-blue-300 hover:underline transition-colors">platform.deepseek.com</a>，创建 API Key，并在官方平台完成充值。</p>
+      <p>2. 用浏览器打开本站：<a href="https://catnip0709.github.io/mydeepseek/" target="_blank" class="text-blue-400 hover:text-blue-300 hover:underline transition-colors">catnip0709.github.io/mydeepseek</a>，在下方输入你的 API Key 即可开始对话。</p>
+      <p>3. 本站<strong class="text-white font-medium">完全免费无广告，不收取任何中间费用</strong>，所有充值仅在 DeepSeek 官方完成。</p>
+    </div>
+
+    <input id="apiKeyInput" class="w-full p-3 bg-gray-800 rounded border border-gray-700 text-white mb-4 outline-none focus:border-blue-500 transition-colors" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+    <button id="saveKey" class="w-full bg-blue-600 hover:bg-blue-700 py-3 rounded-lg text-white font-medium transition-colors">保存并开始使用</button>
+  </div>
+</div>
+
+<div id="infoPanel" class="fixed inset-0 bg-black/95 flex items-center justify-center z-50 hidden">
+  <div class="bg-gray-900 p-6 rounded-2xl w-[90%] max-w-sm border border-gray-700 relative flex flex-col items-center">
+    <button id="closeInfoBtn" class="absolute top-3 right-3 text-gray-400 hover:text-white text-xl leading-none">&times;</button>
+    <div class="text-center mb-4">
+      <h3 class="text-white text-base font-medium mb-3">关于 MyDeepSeek</h3>
+      <p class="text-gray-300 text-sm leading-relaxed text-left">
+        MyDeepSeek站点提供安全、开放、私密、免费的DeepSeek网页客户端。
+      </p>
+      <p class="text-gray-300 text-sm leading-relaxed text-left mt-2">
+        所有充值均在DeepSeek官网完成，无任何第三方充值和广告，无需注册登录。
+      </p>
+      <p class="text-gray-300 text-sm leading-relaxed text-left mt-2">
+        作为个人开发者，期待您的反馈和沟通。如有bug或需求反馈，欢迎加入小红书群聊沟通。
+      </p>
+    </div>
+    <div class="w-48 h-48 bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden border border-gray-700">
+      <img src="https://raw.githubusercontent.com/Catnip0709/mydeepseek/main/redbook.jpg" alt="小红书群聊二维码" class="w-full h-full object-contain">
+    </div>
+  </div>
+</div>
+
+<div id="donatePanel" class="fixed inset-0 bg-black/95 flex items-center justify-center z-50 hidden">
+  <div class="bg-gray-900 p-6 rounded-2xl w-[90%] max-w-sm border border-gray-700 relative flex flex-col items-center">
+    <button id="closeDonateBtn" class="absolute top-3 right-3 text-gray-400 hover:text-white text-xl leading-none">&times;</button>
+    <div class="text-center mb-4">
+      <h3 class="text-white text-base font-medium mb-2">极简、私密、无第三方的DeepSeek网页客户端</h3>
+      <p class="text-gray-300 text-left leading-relaxed">感谢使用本站，无任何强制要求，若您觉得好用，可自愿捐赠支持</p>
+      <p class="text-gray-300 text-left leading-relaxed mt-1">每一份助力，都能让站点陪您更久 ❤️</p>
+    </div>
+    <div class="w-48 h-48 bg-gray-800 rounded-lg flex items-center justify-center overflow-hidden border border-gray-700">
+      <img src="https://raw.githubusercontent.com/Catnip0709/mydeepseek/main/alipay.jpg" alt="支付宝收款码" class="w-full h-full object-contain">
+    </div>
+  </div>
+</div>
+
+<div id="editPanel" class="edit-panel hidden">
+  <div class="edit-container">
+    <h3 class="text-white mb-3">编辑消息</h3>
+    <textarea id="editTextarea" class="edit-textarea" placeholder="编辑消息内容..."></textarea>
+    <div class="edit-buttons">
+      <button id="editCancelBtn" class="edit-btn-cancel">取消</button>
+      <button id="editSaveBtn" class="edit-btn-save">保存并重新生成</button>
+    </div>
+  </div>
+</div>
+
+<div id="renameTabPanel" class="edit-panel hidden">
+  <div class="edit-container">
+    <h3 class="text-white mb-3">修改会话名称</h3>
+    <input id="renameTabInput" class="edit-input" type="text" placeholder="请输入会话名称">
+    <div class="edit-buttons">
+      <button id="renameTabCancelBtn" class="edit-btn-cancel">取消</button>
+      <button id="renameTabSaveBtn" class="edit-btn-save">保存</button>
+    </div>
+  </div>
+</div>
+
+<div id="confirmPanel" class="edit-panel hidden">
+  <div class="edit-container">
+    <h3 id="confirmTitle" class="text-white mb-2">确认操作</h3>
+    <div id="confirmDesc" class="modal-desc"></div>
+    <div class="edit-buttons mt-5">
+      <button id="confirmCancelBtn" class="edit-btn-cancel">取消</button>
+      <button id="confirmOkBtn" class="edit-btn-save">确认</button>
+    </div>
+  </div>
+</div>
+
+<div id="cleanupChoicePanel" class="edit-panel hidden">
+  <div class="edit-container">
+    <h3 class="text-white mb-2">释放本对话空间</h3>
+    <div id="cleanupChoiceDesc" class="modal-desc"></div>
+    <div class="cleanup-choice-list mt-4">
+      <button id="cleanupVersionsBtn" class="cleanup-choice-btn" type="button">
+        <span class="cleanup-choice-main">释放历史版本</span>
+        <span id="cleanupVersionsInfo" class="cleanup-choice-info"></span>
+        <span class="cleanup-choice-sub">删除重新生成留下的旧回复（正文+思考），保留当前显示的回复</span>
+      </button>
+      <button id="cleanupThinkingBtn" class="cleanup-choice-btn" type="button">
+        <span class="cleanup-choice-main">释放思考内容</span>
+        <span id="cleanupThinkingInfo" class="cleanup-choice-info"></span>
+        <span class="cleanup-choice-sub">清除当前回复的思考过程，正文保留</span>
+      </button>
+    </div>
+    <div class="edit-buttons mt-4">
+      <button id="cleanupChoiceCancelBtn" class="edit-btn-cancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<div id="modelInfoPanel" class="edit-panel hidden">
+  <div class="edit-container">
+    <h3 class="text-white mb-3">模型说明</h3>
+    <div class="modal-desc text-xs space-y-3">
+      <div>
+        <div class="model-info-title font-medium mb-1.5">价格（每百万 token）</div>
+        <div class="grid grid-cols-3 gap-1 text-center text-xs">
+          <div></div>
+          <div class="model-info-sub">缓存命中</div>
+          <div class="model-info-sub">未命中</div>
+        </div>
+        <div class="grid grid-cols-3 gap-1 text-center text-xs mt-1">
+          <div class="model-info-name">V4-Flash</div>
+          <div>¥0.2 / ¥2</div>
+          <div>¥1 / ¥2</div>
+        </div>
+        <div class="grid grid-cols-3 gap-1 text-center text-xs">
+          <div class="model-info-name">V4-Pro</div>
+          <div>¥1 / ¥24</div>
+          <div>¥12 / ¥24</div>
+        </div>
+        <div class="model-info-sub mt-1">输入价格 / 输出价格</div>
+      </div>
+      <div class="model-info-sub pt-2 model-info-border">
+        除对话外，TXT 文件解析、指令优化、档案馆整理等功能也会调用所选模型，请根据需要选择。
+      </div>
+    </div>
+    <div class="edit-buttons mt-5">
+      <button class="edit-btn-save" onclick="document.getElementById('modelInfoPanel').classList.add('hidden')">知道了</button>
+    </div>
+  </div>
+</div>
+
+<div id="downloadPanel" class="edit-panel hidden">
+  <div class="edit-container">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="text-white">导出对话</h3>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <span class="text-sm text-gray-400">导出思考过程</span>
+        <div class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" id="includeReasoningToggle" class="sr-only peer" checked>
+          <div class="w-9 h-5 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+        </div>
+      </label>
+    </div>
+    <div class="modal-desc mb-4">请选择导出内容：</div>
+    <div class="download-options">
+      <button id="downloadAllBtn" class="download-option-btn bg-blue-600">
+        下载所有对话
+      </button>
+      <button id="downloadAiOnlyBtn" class="download-option-btn">
+        仅下载DeepSeek回复
+      </button>
+    </div>
+    <div class="edit-buttons mt-5">
+      <button id="downloadCancelBtn" class="edit-btn-cancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<div id="promptOptimizePreviewPanel" class="edit-panel hidden">
+  <div class="edit-container inl_fd9f6e7d33">
+    <h3 class="text-white mb-2">AI 优化建议</h3>
+    <div class="modal-desc">我根据你当前填写的内容做了一版轻量优化，尽量保持原意与原长度。你可以先对比，再决定是否替换。</div>
+    <div class="compare-grid">
+      <div>
+        <div class="compare-title">原内容</div>
+        <div id="originalPromptPreview" class="compare-box"></div>
+      </div>
+      <div>
+        <div class="compare-title">优化后</div>
+        <div id="optimizedPromptPreview" class="compare-box"></div>
+      </div>
+    </div>
+    <div class="edit-buttons mt-5">
+      <button id="discardOptimizedPromptBtn" class="edit-btn-cancel">保留原内容</button>
+      <button id="applyOptimizedPromptBtn" class="edit-btn-save">替换为优化结果</button>
+    </div>
+  </div>
+</div>
+
+<div id="promptPanel" class="panel-modal hidden">
+  <div class="prompt-panel-container">
+    <div class="prompt-panel-header">
+      <h3 class="text-white text-base font-semibold">指令管理</h3>
+      <button id="closePromptPanelBtn" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+
+    <div class="prompt-panel-body">
+      <div id="promptListView">
+        <div class="prompt-toolbar">
+          <button id="addPromptBtn" class="prompt-add-btn">+ 新增指令</button>
+        </div>
+        <div id="promptList" class="prompt-list"></div>
+      </div>
+
+      <div id="promptFormView" class="hidden">
+        <div class="prompt-form">
+          <div class="prompt-form-topbar">
+            <div class="prompt-form-label">编辑指令</div>
+            <div class="prompt-ai-inline">
+              <button id="optimizePromptBtn" class="prompt-ai-opt-btn" type="button" title="智能优化">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"></path>
+                  <path d="M19 16l.9 2.1L22 19l-2.1.9L19 22l-.9-2.1L16 19l2.1-.9L19 16z"></path>
+                </svg>
+              </button>
+              <span class="prompt-ai-label">智能优化</span>
+            </div>
+          </div>
+          <input id="promptTitleInput" class="prompt-input" type="text" placeholder="请输入指令标题（可不填）">
+          <textarea id="promptContentInput" class="prompt-textarea" placeholder="请输入指令内容..."></textarea>
+          <div class="prompt-form-actions">
+            <button id="cancelPromptEditBtn" class="btn-gray">取消</button>
+            <button id="savePromptBtn" class="btn-blue">保存</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="promptMarketPanel" class="panel-modal hidden">
+  <div class="prompt-market-container">
+    <div class="prompt-market-header">
+      <div class="flex items-center gap-3">
+        <h3 class="text-white text-base font-semibold">指令市场</h3>
+        <button id="aiGeneratePromptBtn" class="prompt-market-ai-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"></path>
+          </svg>
+          <span>智能生成</span>
+        </button>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="refreshPromptMarketBtn" class="prompt-market-refresh-btn" title="刷新">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+        </button>
+        <button id="closePromptMarketBtn" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+    </div>
+
+    <div class="prompt-market-body">
+      <textarea id="promptMarketContent" class="prompt-market-content" placeholder="点击刷新按钮获取随机指令..."></textarea>
+    </div>
+
+    <div class="prompt-market-footer">
+      <button id="saveToPromptManagerBtn" class="btn-gray">保存进指令管理</button>
+      <button id="createChatWithPromptBtn" class="btn-blue">新建对话并插入指令</button>
+    </div>
+  </div>
+</div>
+
+<div id="aiGeneratePromptPanel" class="panel-modal hidden">
+  <div class="prompt-market-container">
+    <div class="prompt-market-header">
+      <h3 class="text-white text-base font-semibold">智能生成指令</h3>
+      <button id="closeAiGenerateBtn" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+
+    <div class="prompt-market-body">
+      <div class="mb-4">
+        <label class="text-gray-300 text-sm mb-2 block">请输入关键词或描述</label>
+        <textarea id="aiPromptInput" class="prompt-textarea" placeholder="一句话描述，或关键字，例如：武侠、古风、现代、虐心、悬疑、甜宠、病娇、穿越、重生、权谋、仙侠、末世、科幻、校园、豪门、复仇、治愈、破镜重圆、强制爱、灵异……" rows="3"></textarea>
+      </div>
+      <div class="text-xs text-gray-500 mb-4">AI会根据您的输入生成约100字的指令</div>
+    </div>
+
+    <div class="prompt-market-footer">
+      <button id="cancelAiGenerateBtn" class="btn-gray">取消</button>
+      <button id="confirmAiGenerateBtn" class="btn-blue">
+        <span id="aiGenerateBtnText">生成指令</span>
+        <div id="aiGenerateSpinner" class="loading-spinner hidden"></div>
+      </button>
+    </div>
+  </div>
+</div>
+
+
+<!-- 角色卡管理面板 -->
+<div id="characterPanel" class="panel-modal hidden">
+  <div class="prompt-panel-container">
+    <div class="prompt-panel-header">
+      <h3 class="text-white text-base font-semibold">角色卡管理</h3>
+      <button id="closeCharacterPanelBtn" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+    <div class="prompt-panel-body">
+      <div id="characterListView">
+        <div class="prompt-toolbar">
+          <button id="addCharacterBtn" class="prompt-add-btn">+ 新建角色</button>
+        </div>
+        <div id="characterList" class="prompt-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 角色卡编辑弹窗 -->
+<div id="characterEditPanel" class="panel-modal hidden">
+  <div class="prompt-panel-container">
+    <div class="prompt-panel-header">
+      <h3 class="text-white text-base font-semibold">编辑角色卡</h3>
+      <button id="closeCharacterEditPanelBtn" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+    <div class="prompt-panel-body">
+      <div class="prompt-form">
+        <div class="character-brief-wrapper">
+          <textarea id="characterEditBrief" class="prompt-textarea" placeholder="输入简要描述（如：一个傲娇的18岁女高中生），点击右下角 AI 生成自动填充以下所有字段..." rows="2"></textarea>
+          <div class="prompt-ai-inline character-brief-ai-btn">
+            <button id="aiEnhanceBtn" class="prompt-ai-opt-btn" type="button" title="AI 生成角色卡">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"></path>
+                <path d="M19 16l.9 2.1L22 19l-2.1.9L19 22l-.9-2.1L16 19l2.1-.9L19 16z"></path>
+              </svg>
+            </button>
+            <span id="aiEnhanceLabel" class="prompt-ai-label">AI 生成</span>
+          </div>
+        </div>
+        <div class="character-edit-field">
+          <label class="character-field-label">角色名字 *</label>
+          <input id="characterEditName" class="prompt-input" type="text" placeholder="例如：林小雨">
+        </div>
+        <div class="character-edit-field">
+          <label class="character-field-label">一句话摘要</label>
+          <input id="characterEditSummary" class="prompt-input" type="text" placeholder="用于路由判断，如：傲娇少女，18岁，说话带'哼'">
+        </div>
+        <div class="character-edit-field">
+          <label class="character-field-label">性格</label>
+          <textarea id="characterEditPersonality" class="prompt-textarea" placeholder="详细描述角色的性格特征..." rows="3"></textarea>
+        </div>
+        <div class="character-edit-field">
+          <label class="character-field-label">背景经历</label>
+          <textarea id="characterEditBackground" class="prompt-textarea" placeholder="角色的背景故事..." rows="3"></textarea>
+        </div>
+        <div class="character-edit-field">
+          <label class="character-field-label">外貌描写</label>
+          <textarea id="characterEditAppearance" class="prompt-textarea" placeholder="角色的外貌特征..." rows="2"></textarea>
+        </div>
+        <div class="character-edit-field">
+          <label class="character-field-label">说话风格</label>
+          <textarea id="characterEditSpeakingStyle" class="prompt-textarea" placeholder="角色的说话方式和语气..." rows="2"></textarea>
+        </div>
+        <div class="character-edit-field">
+          <label class="character-field-label">口头禅</label>
+          <input id="characterEditCatchphrases" class="prompt-input" type="text" placeholder="用顿号分隔，如：哼、才不是呢、别误会">
+        </div>
+        <div class="character-edit-field">
+          <label class="character-field-label">活跃度</label>
+          <div class="talkativeness-slider-wrapper">
+            <span class="talkativeness-label-left">冷淡</span>
+            <input id="characterEditTalkativeness" type="range" min="0.5" max="1.0" step="0.1" value="0.8" class="talkativeness-slider">
+            <span class="talkativeness-label-right">活泼</span>
+          </div>
+          <span id="characterEditTalkativenessVal" class="talkativeness-value">0.8</span>
+        </div>
+        <div class="character-edit-field">
+          <label class="character-field-label">回复语言</label>
+          <select id="characterEditReplyLanguage" class="prompt-input" style="padding:0.5rem 0.75rem;">
+            <option value="zh-CN">简体中文（默认）</option>
+            <option value="en">English（自带中文翻译）</option>
+            <option value="ja">日本語（自带中文翻译）</option>
+            <option value="ko">한국어（自带中文翻译）</option>
+            <option value="fr">Français（自带中文翻译）</option>
+            <option value="de">Deutsch（自带中文翻译）</option>
+            <option value="es">Español（自带中文翻译）</option>
+            <option value="ru">Русский（自带中文翻译）</option>
+          </select>
+        </div>
+        <div class="prompt-form-actions">
+          <button id="cancelCharacterEditBtn" class="btn-gray">取消</button>
+          <button id="saveCharacterBtn" class="btn-blue">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 新建群聊面板 -->
+<div id="createGroupPanel" class="panel-modal hidden">
+  <div class="prompt-panel-container">
+    <div class="prompt-panel-header">
+      <h3 class="text-white text-base font-semibold">新建群聊（功能测试中）</h3>
+      <button id="closeCreateGroupBtn" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+    <div class="prompt-panel-body">
+      <div class="mb-4">
+        <label class="text-gray-300 text-sm mb-2 block">群聊名称（可不填）</label>
+        <input id="createGroupNameInput" class="prompt-input" type="text" placeholder="例如：日常闲聊群">
+      </div>
+      <div class="mb-4">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-gray-300 text-sm">选择角色（至少 2 个）</label>
+          <button id="openCharacterFromGroupBtn" class="text-blue-400 text-sm hover:underline">管理角色卡</button>
+        </div>
+        <div id="createGroupCharacterList" class="space-y-1 max-h-60 overflow-y-auto"></div>
+      </div>
+    </div>
+    <div class="prompt-market-footer">
+      <button id="cancelCreateGroupBtn" class="btn-gray">取消</button>
+      <button id="createGroupConfirmBtn" class="btn-blue">创建群聊</button>
+    </div>
+  </div>
+</div>
+
+<div id="characterSelectPanel" class="panel-modal hidden">
+  <div class="prompt-panel-container">
+    <div class="prompt-panel-header">
+      <h3 class="text-white text-base font-semibold">选择角色</h3>
+      <button id="closeCharacterSelectBtn" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+    <div id="characterSelectList" class="p-4 space-y-2 max-h-[60vh] overflow-y-auto"></div>
+  </div>
+</div>
+
+<!-- 背景信息面板（通用，所有会话类型可用） -->
+<div id="bgInfoPanel" class="panel-modal hidden">
+  <div class="prompt-panel-container">
+    <div class="prompt-panel-header">
+      <h3 class="text-white text-base font-semibold">背景信息</h3>
+      <button id="closeBgInfoBtn" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+    </div>
+    <div class="prompt-panel-body">
+      <div class="mb-4">
+        <label class="text-gray-300 text-sm mb-2 block">你的角色名称</label>
+        <input id="bgInfoRoleInput" class="prompt-input" type="text" placeholder="例如：旅行者、探险队长、旁白...">
+        <div class="text-xs text-gray-500 mt-1">设定你在对话中的身份名称，AI 会以此称呼你</div>
+      </div>
+      <div class="mb-4">
+        <label class="text-gray-300 text-sm mb-2 block">对话背景</label>
+        <textarea id="bgInfoStoryInput" class="prompt-input" rows="5" placeholder="例如：故事发生在一个魔法学院，新学期刚刚开始，主角们正在大厅等待分院仪式..."></textarea>
+        <div class="text-xs text-gray-500 mt-1">描述当前的场景、时间、地点和正在发生的事情，AI 在后续对话中会始终记住这些信息</div>
+      </div>
+      <div class="mb-4">
+        <label class="text-gray-300 text-sm mb-2 block">禁用词</label>
+        <textarea id="bgInfoBannedWordsInput" class="prompt-input" rows="3" placeholder="例如：几不可闻、喉结滚动、眸色一暗"></textarea>
+        <div class="text-xs text-gray-500 mt-1">支持逗号、顿号、分号或换行分隔。系统会自动把这些词作为高优先级写作禁用词加入 Prompt。</div>
+      </div>
+    </div>
+    <div class="prompt-market-footer bg-info-footer">
+      <button id="saveBgInfoBtn" class="btn-blue">保存</button>
+      <button id="cancelBgInfoBtn" class="btn-gray">取消</button>
+    </div>
+  </div>
+</div>
+
+<div id="storyArchivePanel" class="panel-modal hidden">
+  <div class="prompt-market-container story-archive-container">
+    <div class="prompt-market-header">
+      <div class="story-archive-header-main">
+        <h3 class="text-white text-base font-semibold">剧情档案馆</h3>
+        <span id="storyArchiveStatus" class="story-archive-status warning">未生成</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="refreshStoryArchiveBtn" class="prompt-market-ai-btn" type="button">
+          <span class="story-archive-refresh-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+          </span>
+          <span id="refreshStoryArchiveBtnText">刷新整理</span>
+        </button>
+        <button id="closeStoryArchiveBtn" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+    </div>
+
+    <div class="prompt-market-body story-archive-body">
+      <div id="storyArchiveFeedback" class="story-archive-feedback hidden">
+        <div class="story-archive-feedback-head">
+          <div class="story-archive-feedback-copy">
+            <div id="storyArchiveFeedbackTitle" class="story-archive-feedback-title"></div>
+            <div id="storyArchiveFeedbackBody" class="story-archive-feedback-body"></div>
+          </div>
+          <button id="retryStoryArchiveBtn" class="story-archive-feedback-action hidden" type="button">重试整理</button>
+          <button id="copyArchiveDebugBtn" class="story-archive-feedback-action hidden" type="button">复制日志</button>
+        </div>
+        <div id="storyArchiveFeedbackHint" class="story-archive-feedback-hint hidden"></div>
+      </div>
+      <div id="storyArchiveMeta" class="story-archive-meta"></div>
+
+      <div class="story-archive-overview-grid">
+        <div class="story-archive-overview-card">
+          <div class="story-archive-overview-label">故事核心</div>
+          <div id="storyArchivePremise" class="story-archive-overview-value"></div>
+        </div>
+        <div class="story-archive-overview-card">
+          <div class="story-archive-overview-label">当前主线</div>
+          <div id="storyArchiveArc" class="story-archive-overview-value"></div>
+        </div>
+        <div class="story-archive-overview-card">
+          <div class="story-archive-overview-label">整体氛围</div>
+          <div id="storyArchiveTone" class="story-archive-overview-value"></div>
+        </div>
+      </div>
+
+      <details class="story-archive-section" open>
+        <summary class="story-archive-section-title">人物关系表</summary>
+        <div id="storyArchiveRelationships" class="story-archive-list"></div>
+      </details>
+
+      <details class="story-archive-section" open>
+        <summary class="story-archive-section-title">事件时间线</summary>
+        <div id="storyArchiveTimeline" class="story-archive-list"></div>
+      </details>
+
+      <details class="story-archive-section" open>
+        <summary class="story-archive-section-title">伏笔清单</summary>
+        <div id="storyArchiveForeshadows" class="story-archive-list"></div>
+      </details>
+
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
